@@ -21,25 +21,28 @@ module.exports = async (req, res) => {
       redirect_uri: `https://${process.env.VERCEL_URL}/api/auth`
     }), { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
 
-    // --- PASO DE DEBUG (El espía): ---
-    // Esto imprimirá en los logs de Vercel todo lo que GHL nos responde
-    console.log("Respuesta completa de GHL:", JSON.stringify(response.data));
+    // --- IMPRESIÓN CRÍTICA PARA EL LOG ---
+    console.log("JSON RECIBIDO DE GHL:", JSON.stringify(response.data));
 
-    // --- LÓGICA DE EXTRACCIÓN MEJORADA: ---
-    // Probamos extraer el ID de varias formas comunes por si GHL cambió el nombre
-    const locationId = response.data.locationId || response.data.location_id; 
+    // --- BUSCADOR MULTI-CAPA DE ID ---
+    // GHL a veces lo pone en la raíz, a veces dentro de 'locationId', o en 'meta'
+    const locationId = 
+        response.data.locationId || 
+        response.data.location_id || 
+        (response.data.meta && response.data.meta.locationId) ||
+        (response.data.context && response.data.context.locationId);
 
     if (!locationId) {
-        console.error("¡ALERTA! No encontré el locationId en la respuesta de GHL:", response.data);
-        return res.status(500).send('Error: La respuesta de GHL no contiene el ID de la ubicación.');
+        // Si falla, mostramos el JSON real en pantalla para no adivinar más
+        return res.status(500).send(`Error: No se halló ID. Datos recibidos: ${JSON.stringify(response.data)}`);
     }
 
-    // --- GUARDADO EN REDIS: ---
+    // Guardar el token (ahora sí con el ID real)
     await redis.set(`token:${locationId}`, response.data.access_token);
     
     res.send('¡Instalación exitosa! Ya puedes cerrar esta ventana.');
   } catch (error) {
-    console.error("Error al intercambiar el token:", error.response?.data || error.message);
+    console.error("Error técnico:", error.response?.data || error.message);
     res.status(500).send('Error al intercambiar el token');
   }
 };
