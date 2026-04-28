@@ -22,6 +22,7 @@ module.exports = async (req, res) => {
     }), { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
 
     // Guardamos el token en Redis usando el locationId como llave
+    // test para push
     await redis.set(`token:${response.data.locationId}`, response.data.access_token);
     
     res.send('¡Instalación exitosa! Ya puedes cerrar esta ventana.');
