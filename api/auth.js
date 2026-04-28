@@ -21,13 +21,25 @@ module.exports = async (req, res) => {
       redirect_uri: `https://${process.env.VERCEL_URL}/api/auth`
     }), { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
 
-    // Guardamos el token en Redis usando el locationId como llave
-    // test para push
-    await redis.set(`token:${response.data.locationId}`, response.data.access_token);
+    // --- PASO DE DEBUG (El espía): ---
+    // Esto imprimirá en los logs de Vercel todo lo que GHL nos responde
+    console.log("Respuesta completa de GHL:", JSON.stringify(response.data));
+
+    // --- LÓGICA DE EXTRACCIÓN MEJORADA: ---
+    // Probamos extraer el ID de varias formas comunes por si GHL cambió el nombre
+    const locationId = response.data.locationId || response.data.location_id; 
+
+    if (!locationId) {
+        console.error("¡ALERTA! No encontré el locationId en la respuesta de GHL:", response.data);
+        return res.status(500).send('Error: La respuesta de GHL no contiene el ID de la ubicación.');
+    }
+
+    // --- GUARDADO EN REDIS: ---
+    await redis.set(`token:${locationId}`, response.data.access_token);
     
     res.send('¡Instalación exitosa! Ya puedes cerrar esta ventana.');
   } catch (error) {
-    console.error(error.response?.data || error.message);
+    console.error("Error al intercambiar el token:", error.response?.data || error.message);
     res.status(500).send('Error al intercambiar el token');
   }
 };
