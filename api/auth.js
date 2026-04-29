@@ -17,32 +17,23 @@ module.exports = async (req, res) => {
       client_secret: process.env.GHL_CLIENT_SECRET,
       grant_type: 'authorization_code',
       code: code,
-      user_type: 'Location',
+      user_type: 'Company', // Confirmado por tu JSON
       redirect_uri: `https://${process.env.VERCEL_URL}/api/auth`
     }), { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
 
-    // --- IMPRESIÓN CRÍTICA PARA EL LOG ---
-    console.log("JSON RECIBIDO DE GHL:", JSON.stringify(response.data));
+    // Extraemos el companyId basándonos en tu respuesta real
+    const companyId = response.data.companyId;
 
-    // --- BUSCADOR MULTI-CAPA DE ID ---
-    // GHL a veces lo pone en la raíz, a veces dentro de 'locationId', o en 'meta'
-    const locationId = 
-        response.data.locationId || 
-        response.data.location_id || 
-        (response.data.meta && response.data.meta.locationId) ||
-        (response.data.context && response.data.context.locationId);
-
-    if (!locationId) {
-        // Si falla, mostramos el JSON real en pantalla para no adivinar más
-        return res.status(500).send(`Error: No se halló ID. Datos recibidos: ${JSON.stringify(response.data)}`);
+    if (!companyId) {
+        return res.status(500).send('Error: No se encontró companyId en la respuesta final.');
     }
 
-    // Guardar el token (ahora sí con el ID real)
-    await redis.set(`token:${locationId}`, response.data.access_token);
+    // Guardamos en Redis usando el ID de la compañía
+    await redis.set(`token:${companyId}`, response.data.access_token);
     
-    res.send('¡Instalación exitosa! Ya puedes cerrar esta ventana.');
+    res.send('¡Instalación exitosa! La conexión con la agencia ha sido establecida.');
   } catch (error) {
-    console.error("Error técnico:", error.response?.data || error.message);
-    res.status(500).send('Error al intercambiar el token');
+    console.error("Error en el intercambio:", error.response?.data || error.message);
+    res.status(500).send('Error al procesar la instalación.');
   }
 };
